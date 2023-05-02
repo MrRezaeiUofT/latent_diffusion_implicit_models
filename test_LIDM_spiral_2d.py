@@ -23,7 +23,7 @@ print(f'The g_theta model has {count_parameters(model.g_theta):,} trainable para
 print(f'The f_phi model has {count_parameters(model.f_phi):,} trainable parameters')
 print(f'The f_phi.f_phi_x model has {count_parameters(model.f_phi.f_phi_x):,} trainable parameters')
 print(f'The LIDM model has {count_parameters(model):,} trainable parameters')
-optimizer = optim.Adam(model.parameters(), lr=1e-2)
+optimizer = optim.Adam(model.parameters(), lr=1e-3)
 CLIP = 1
 total_loss=[]
 for epoch in range(150):

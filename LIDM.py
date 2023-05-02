@@ -55,13 +55,15 @@ class f_phi_x(nn.Module):
         return embedded
 
 class f_phi(nn.Module):
-    def __init__(self, obser_dim, latent_dim, n_layers,alpha, dropout, bidirectional ):
+    def __init__(self, obser_dim, latent_dim, n_layers,alpha, sigma_x, sigma_z, dropout, bidirectional ):
         super().__init__()
         self.obser_dim = obser_dim
         self.latent_dim = latent_dim
         self.n_layers = n_layers
         self.bidirectional = bidirectional
         self.alpha = alpha
+        self.sigma_x=sigma_x
+        self.sigma_z=sigma_z
         self.dropout=dropout
         self.f_phi_x= f_phi_x(input_dim=self.obser_dim,
                               output_dim=self.latent_dim,
@@ -81,9 +83,11 @@ class f_phi(nn.Module):
     def forward(self, x_k, hidden, cell):
 
         hidden=self.embedding_z(hidden)
+        hidden = hidden + self.sigma_z * torch.randn(hidden.shape)
+        embedded_new=self.f_phi_x(x_k)
         # embedded = [1, batch size, latent dim]
-        embedded_new= torch.sqrt(self.alpha)*self.f_phi_x(x_k)# + torch.sqrt(1-self.alpha)*hidden
-        embedded_new = embedded_new.unsqueeze(0)
+        embedded_new= torch.sqrt(self.alpha)*embedded_new+self.sigma_x * torch.randn(embedded_new.shape) # + torch.sqrt(1-self.alpha)*hidden
+        embedded_new=embedded_new.unsqueeze(0)
         # embedded_new = self.dropout(self.embedding_z(embedded_new))
         output, (hidden, cell) = self.rnn(embedded_new, (hidden,cell))
 
@@ -112,6 +116,8 @@ class LIDM(nn.Module):
                           latent_dim=self.latent_dim,
                           n_layers= self.n_layers,
                            alpha=self.alpha,
+                           sigma_x=self.sigma_x,
+                           sigma_z=self.sigma_z,
                           dropout=self.dp_rate,
                           bidirectional=False)
 
@@ -151,7 +157,7 @@ class LIDM(nn.Module):
         L2=F.mse_loss(torch.sqrt(self.alpha)*self.f_phi.f_phi_x(self.obsrv[1:]),
                       self.outputs[1:]-torch.sqrt(1-self.alpha)*self.outputs[:-1])
 
-        L= L1*torch.pow(self.sigma_x,2)/(torch.pow(self.sigma_z,2)*torch.sqrt(self.alpha))
+        L= L2+ L1*torch.pow(self.sigma_x,2)/(torch.pow(self.sigma_z,2)*torch.sqrt(self.alpha))
         return L
 
 
