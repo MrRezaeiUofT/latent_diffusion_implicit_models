@@ -51,6 +51,7 @@ plt.show()
 plt.figure()
 z_hat=z_hat.detach().cpu().numpy().squeeze()
 z=z.detach().cpu().numpy().squeeze()
+z_hat = 2*(z_hat-z_hat.min(axis=0))/(z_hat.max(axis=0)-z_hat.min(axis=0))-1
 plt.plot(z_hat[:,0],z_hat[:,1], 'r')
 plt.plot(z[:,0], z[:,1], 'k')
 plt.show()
