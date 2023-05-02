@@ -22,7 +22,10 @@ class g_theta(nn.Module):
         self.output_dim = output_dim
 
         self.input_dim=input_dim
-        self.embedding = nn.Sequential(nn.Linear(input_dim, input_dim),nn.Linear(input_dim, output_dim))
+        self.embedding = nn.Sequential(nn.Linear(input_dim, input_dim),
+                                       nn.Linear(input_dim, input_dim),
+                                       nn.Linear(input_dim, output_dim)
+                                       )
         # self.rnn = nn.LSTM(input_dim, input_dim, n_layers, dropout=dropout, bidirectional =bidirectional )
         self.dropout = nn.Dropout(dropout)
 
@@ -39,7 +42,9 @@ class f_phi_x(nn.Module):
         self.output_dim = output_dim
         self.n_layers = n_layers
         self.input_dim=input_dim
-        self.embedding =  nn.Sequential(nn.Linear(input_dim, output_dim),nn.Linear(output_dim, output_dim))
+        self.embedding =  nn.Sequential(nn.Linear(input_dim, output_dim),
+                                        nn.Linear(output_dim, output_dim),
+                                        nn.Linear(output_dim, output_dim))
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, input):
@@ -57,10 +62,11 @@ class f_phi(nn.Module):
         self.n_layers = n_layers
         self.bidirectional = bidirectional
         self.alpha = alpha
-        self.f_phi_x= f_phi_x(input_dim=obser_dim,
-                              output_dim=latent_dim,
-                              n_layers=2,
-                              dropout=.1
+        self.dropout=dropout
+        self.f_phi_x= f_phi_x(input_dim=self.obser_dim,
+                              output_dim=self.latent_dim,
+                              n_layers=self.n_layers ,
+                              dropout=self.dropout
                               )
         if bidirectional:
             self.fc_out = nn.Linear(2 * latent_dim, latent_dim)
@@ -74,8 +80,7 @@ class f_phi(nn.Module):
 
     def forward(self, x_k, hidden, cell):
 
-
-
+        hidden=self.embedding_z(hidden)
         # embedded = [1, batch size, latent dim]
         embedded_new= torch.sqrt(self.alpha)*self.f_phi_x(x_k)# + torch.sqrt(1-self.alpha)*hidden
         embedded_new = embedded_new.unsqueeze(0)
@@ -93,15 +98,15 @@ class f_phi(nn.Module):
         return prediction, hidden, cell
 
 class LIDM(nn.Module):
-    def __init__(self, latent_dim, obser_dim, sigma_x, sigma_z, device):
+    def __init__(self, latent_dim, obser_dim, sigma_x, sigma_z, alpha, device):
         super().__init__()
         self.latent_dim=latent_dim
         self.obser_dim =obser_dim
         self.device=device
         self.sigma_x=torch.tensor([sigma_x], requires_grad=False )
         self.sigma_z=torch.tensor([sigma_z], requires_grad=False )
-        self.alpha = torch.tensor([.5], requires_grad=False)
-        self.n_layers=2
+        self.alpha = torch.tensor([alpha], requires_grad=False)
+        self.n_layers=5
         self.dp_rate=.1
         self.f_phi = f_phi(obser_dim=self.obser_dim,
                           latent_dim=self.latent_dim,
@@ -132,7 +137,7 @@ class LIDM(nn.Module):
         # last hidden state of the encoder is used as the initial hidden state of the decoder
 
         z= Variable(torch.randn((self.n_layers,batch_size, self.latent_dim))).to(self.device)
-        cell=torch.zeros_like(z)
+        cell=z
         for k in range(1, seq_len):
 
             output, z, cell = self.f_phi(self.obsrv[k], z, cell)
@@ -146,7 +151,7 @@ class LIDM(nn.Module):
         L2=F.mse_loss(torch.sqrt(self.alpha)*self.f_phi.f_phi_x(self.obsrv[1:]),
                       self.outputs[1:]-torch.sqrt(1-self.alpha)*self.outputs[:-1])
 
-        L=L2+ L1*torch.pow(self.sigma_x,2)/(torch.pow(self.sigma_z,2)*torch.sqrt(self.alpha))
+        L= L1*torch.pow(self.sigma_x,2)/(torch.pow(self.sigma_z,2)*torch.sqrt(self.alpha))
         return L
 
 
@@ -167,7 +172,7 @@ class get_dataset(Dataset):
 
 def init_weights(m):
     for name, param in m.named_parameters():
-        nn.init.uniform_(param.data, -0.08, 0.08)
+        nn.init.uniform_(param.data, -0.8, 0.8)
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
