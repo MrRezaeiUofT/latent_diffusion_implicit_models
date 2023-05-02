@@ -55,9 +55,10 @@ class f_phi_x(nn.Module):
         return embedded
 
 class f_phi(nn.Module):
-    def __init__(self, obser_dim, latent_dim, n_layers,alpha, sigma_x, sigma_z, dropout, bidirectional ):
+    def __init__(self, obser_dim, latent_dim, n_layers,alpha, sigma_x, sigma_z, dropout, bidirectional,device):
         super().__init__()
         self.obser_dim = obser_dim
+        self.device=device
         self.latent_dim = latent_dim
         self.n_layers = n_layers
         self.bidirectional = bidirectional
@@ -83,10 +84,10 @@ class f_phi(nn.Module):
     def forward(self, x_k, hidden, cell):
 
         hidden=self.embedding_z(hidden)
-        hidden = hidden + self.sigma_z * torch.randn(hidden.shape)
+        hidden = hidden + self.sigma_z * torch.randn(hidden.shape).to(self.device)
         embedded_new=self.f_phi_x(x_k)
         # embedded = [1, batch size, latent dim]
-        embedded_new= torch.sqrt(self.alpha)*embedded_new+self.sigma_x * torch.randn(embedded_new.shape) # + torch.sqrt(1-self.alpha)*hidden
+        embedded_new= torch.sqrt(self.alpha)*embedded_new+self.sigma_x * torch.randn(embedded_new.shape).to(self.device) # + torch.sqrt(1-self.alpha)*hidden
         embedded_new=embedded_new.unsqueeze(0)
         # embedded_new = self.dropout(self.embedding_z(embedded_new))
         output, (hidden, cell) = self.rnn(embedded_new, (hidden,cell))
@@ -107,10 +108,10 @@ class LIDM(nn.Module):
         self.latent_dim=latent_dim
         self.obser_dim =obser_dim
         self.device=device
-        self.sigma_x=torch.tensor([sigma_x], requires_grad=False )
-        self.sigma_z=torch.tensor([sigma_z], requires_grad=False )
-        self.alpha = torch.tensor([alpha], requires_grad=False)
-        self.n_layers=5
+        self.sigma_x=torch.tensor([sigma_x], requires_grad=False ).to(self.device)
+        self.sigma_z=torch.tensor([sigma_z], requires_grad=False ).to(self.device)
+        self.alpha = torch.tensor([alpha], requires_grad=False).to(self.device)
+        self.n_layers=25
         self.dp_rate=.1
         self.f_phi = f_phi(obser_dim=self.obser_dim,
                           latent_dim=self.latent_dim,
@@ -119,7 +120,8 @@ class LIDM(nn.Module):
                            sigma_x=self.sigma_x,
                            sigma_z=self.sigma_z,
                           dropout=self.dp_rate,
-                          bidirectional=False)
+                          bidirectional=False,
+                           device=self.device)
 
         self.g_theta = g_theta( input_dim=self.latent_dim,
                                 output_dim=self.obser_dim,

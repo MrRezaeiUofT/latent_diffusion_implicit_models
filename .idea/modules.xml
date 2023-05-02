@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/latent_diffusion_implicit_models.iml" filepath="$PROJECT_DIR$/.idea/latent_diffusion_implicit_models.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../my_inference_ws/.idea/my_inference_ws.iml" filepath="$PROJECT_DIR$/../my_inference_ws/.idea/my_inference_ws.iml" />
     </modules>
   </component>
 </project>
