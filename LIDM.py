@@ -89,7 +89,7 @@ class f_phi(nn.Module):
     def forward(self, x_k, hidden, cell):
 
         hidden=self.embedding_z(hidden)
-        hidden = hidden + self.sigma_z * torch.randn(hidden.shape).to(self.device)
+
         x_k=x_k.unsqueeze(0)
         embedded_new=self.f_phi_x(x_k)
         # embedded = [1, batch size, latent dim]
@@ -97,7 +97,7 @@ class f_phi(nn.Module):
 
         # embedded_new = self.dropout(self.embedding_z(embedded_new))
         output, (hidden, cell) = self.rnn(embedded_new, (hidden,cell))
-
+        hidden = hidden + self.sigma_z * torch.randn(hidden.shape).to(self.device)
         # output = [seq len, batch size, out dim * n directions]
         # hidden = [n layers * n directions, batch size, out dim]
         # cell = [n layers * n directions, batch size, out dim]
@@ -150,7 +150,7 @@ class LIDM(nn.Module):
 
         # last hidden state of the encoder is used as the initial hidden state of the decoder
 
-        z= Variable(torch.randn((self.n_layers,batch_size, self.latent_dim))).to(self.device)
+        z= self.sigma_z*Variable(torch.randn((self.n_layers,batch_size, self.latent_dim))).to(self.device)
         cell=torch.zeros_like(z)
         for k in range(1, seq_len):
 
@@ -160,14 +160,14 @@ class LIDM(nn.Module):
             self.outputs[k] = output
 
         self.x_hat=self.g_theta(self.outputs[:-1])
-        self.z_x_hat =self.f_phi.f_phi_x(self.x_hat)
+        self.z_x_hat =self.f_phi.f_phi_x(self.obsrv[1:])
         return self.outputs
     def loss (self, a,b):
         L1=F.mse_loss(self.x_hat, self.obsrv[1:])
         L2=F.mse_loss(self.outputs[1:]-torch.sqrt(1-self.alpha)*self.outputs[:-1],
                       torch.sqrt(self.alpha)*self.z_x_hat)
 
-        L= a*L2+ b*L1#*torch.pow(self.sigma_x,2)/(torch.pow(self.sigma_z,2)*torch.sqrt(self.alpha))
+        L= a*L2+ b*L1*torch.pow(self.sigma_z,2)/(torch.pow(self.sigma_x,2)*torch.sqrt(self.alpha))
         return L
 
 
