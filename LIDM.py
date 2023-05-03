@@ -154,12 +154,12 @@ class LIDM(nn.Module):
             self.outputs[k] = output
 
         return self.outputs
-    def loss (self):
+    def loss (self, a,b):
         L1=F.mse_loss(self.obsrv[1:], self.g_theta(self.outputs[:-1]))
         L2=F.mse_loss(torch.sqrt(self.alpha)*self.f_phi.f_phi_x(self.obsrv[1:]),
                       self.outputs[1:]-torch.sqrt(1-self.alpha)*self.outputs[:-1])
 
-        L= L2+ L1*torch.pow(self.sigma_x,2)/(torch.pow(self.sigma_z,2)*torch.sqrt(self.alpha))
+        L= a*L2+ b*L1#*torch.pow(self.sigma_x,2)/(torch.pow(self.sigma_z,2)*torch.sqrt(self.alpha))
         return L
 
 
