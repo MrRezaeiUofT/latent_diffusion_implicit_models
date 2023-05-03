@@ -8,9 +8,9 @@ import torch
 from torch.distributions import MultivariateNormal
 import pickle
 
-def generate_spiral2d(nspiral=1000,
-                      ntotal=500,
-                      nsample=100,
+def generate_spiral2d(nspiral=10,
+                      ntotal=100,
+                      nsample=1,
                       start=0.,
                       stop=1,  # approximately equal to 6pi
                       noise_std=.1,
@@ -86,14 +86,14 @@ def generate_spiral2d(nspiral=1000,
 
 if __name__ == "__main__":
 
-    nspiral = 1000
-    start = 0.
+    nspiral = 10
+    start = 4 * np.pi
     stop = 6 * np.pi
     noise_std = .3
     a = 0.
     b = .3
-    ntotal = 1000
-    nsample = 100
+    ntotal = 10
+    nsample = 10
     device = torch.device('cuda:'
                           if torch.cuda.is_available() else 'cpu')
     orig_trajs, samp_trajs, orig_ts, samp_ts = generate_spiral2d(
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     orig_trajs = torch.from_numpy(orig_trajs).float().to(device)
     samp_trajs = torch.from_numpy(samp_trajs).float().to(device)
     samp_ts = torch.from_numpy(samp_ts).float().to(device)
-    number_of_obsr = 3
+    number_of_obsr = 30
     trj_noise_std = .05
     selected_trj = orig_trajs[3]
     noisy_trj = np.zeros_like(selected_trj)
