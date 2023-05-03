@@ -123,10 +123,11 @@ if __name__ == "__main__":
     plt.figure()
 
     for ii in range(number_of_obsr):
-        plt.scatter(observations[:, 0,:], observations[:, 1,:],marker='o', c='k',s=3)
-    plt.scatter(noisy_trj[:, 0], noisy_trj[:, 1], label='noisy state', marker='*', c='r', s=3)
+        plt.scatter(observations[:, 0,:], observations[:, 1,:],marker='o', c='k',s=3, alpha=.1)
     plt.plot(selected_trj[:, 0], selected_trj[:, 1],
              'g', label='true trajectory')
+    plt.scatter(noisy_trj[:, 0], noisy_trj[:, 1], label='noisy state', marker='*', c='r', s=20)
+
     plt.legend()
     plt.savefig('vis.png', dpi=500)
     print('Saved visualization figure at {}'.format('vis.png'))

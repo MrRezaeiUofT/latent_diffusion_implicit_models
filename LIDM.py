@@ -23,7 +23,9 @@ class g_theta(nn.Module):
 
         self.input_dim=input_dim
         self.embedding = nn.Sequential(nn.Linear(input_dim, input_dim),
+                                       nn.ReLU(True),
                                        nn.Linear(input_dim, input_dim),
+                                       nn.ReLU(True),
                                        nn.Linear(input_dim, output_dim)
                                        )
         # self.rnn = nn.LSTM(input_dim, input_dim, n_layers, dropout=dropout, bidirectional =bidirectional )
@@ -43,7 +45,10 @@ class f_phi_x(nn.Module):
         self.n_layers = n_layers
         self.input_dim=input_dim
         self.embedding =  nn.Sequential(nn.Linear(input_dim, output_dim),
+                                        nn.ReLU(True),
+                                        # nn.BatchNorm1d(output_dim),
                                         nn.Linear(output_dim, output_dim),
+                                        nn.ReLU(True),
                                         nn.Linear(output_dim, output_dim))
         self.dropout = nn.Dropout(dropout)
 
@@ -85,10 +90,11 @@ class f_phi(nn.Module):
 
         hidden=self.embedding_z(hidden)
         hidden = hidden + self.sigma_z * torch.randn(hidden.shape).to(self.device)
+        x_k=x_k.unsqueeze(0)
         embedded_new=self.f_phi_x(x_k)
         # embedded = [1, batch size, latent dim]
         embedded_new= torch.sqrt(self.alpha)*embedded_new+self.sigma_x * torch.randn(embedded_new.shape).to(self.device) # + torch.sqrt(1-self.alpha)*hidden
-        embedded_new=embedded_new.unsqueeze(0)
+
         # embedded_new = self.dropout(self.embedding_z(embedded_new))
         output, (hidden, cell) = self.rnn(embedded_new, (hidden,cell))
 
@@ -145,7 +151,7 @@ class LIDM(nn.Module):
         # last hidden state of the encoder is used as the initial hidden state of the decoder
 
         z= Variable(torch.randn((self.n_layers,batch_size, self.latent_dim))).to(self.device)
-        cell=z
+        cell=torch.zeros_like(z)
         for k in range(1, seq_len):
 
             output, z, cell = self.f_phi(self.obsrv[k], z, cell)
@@ -153,11 +159,13 @@ class LIDM(nn.Module):
             # place predictions in a tensor holding predictions for each token
             self.outputs[k] = output
 
+        self.x_hat=self.g_theta(self.outputs[:-1])
+        self.z_x_hat =self.f_phi.f_phi_x(self.x_hat)
         return self.outputs
     def loss (self, a,b):
-        L1=F.mse_loss(self.obsrv[1:], self.g_theta(self.outputs[:-1]))
-        L2=F.mse_loss(torch.sqrt(self.alpha)*self.f_phi.f_phi_x(self.g_theta(self.outputs[:-1])),
-                      self.outputs[1:]-torch.sqrt(1-self.alpha)*self.outputs[:-1])
+        L1=F.mse_loss(self.x_hat, self.obsrv[1:])
+        L2=F.mse_loss(self.outputs[1:]-torch.sqrt(1-self.alpha)*self.outputs[:-1],
+                      torch.sqrt(self.alpha)*self.z_x_hat)
 
         L= a*L2+ b*L1#*torch.pow(self.sigma_x,2)/(torch.pow(self.sigma_z,2)*torch.sqrt(self.alpha))
         return L
