@@ -90,8 +90,9 @@ class f_phi(nn.Module):
 
         hidden=self.embedding_z(hidden)
 
-        x_k=x_k.unsqueeze(0)
+
         embedded_new=self.f_phi_x(x_k)
+        embedded_new = embedded_new.unsqueeze(0)
         # embedded = [1, batch size, latent dim]
         embedded_new= torch.sqrt(self.alpha)*embedded_new+self.sigma_x * torch.randn(embedded_new.shape).to(self.device) # + torch.sqrt(1-self.alpha)*hidden
 

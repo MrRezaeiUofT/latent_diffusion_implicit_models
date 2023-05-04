@@ -108,28 +108,29 @@ if __name__ == "__main__":
     samp_ts = torch.from_numpy(samp_ts).float().to(device)
     number_of_obsr = 30
     trj_noise_std = .05
-    selected_trj = orig_trajs[4]
+    selected_trj = orig_trajs
     noisy_trj = np.zeros_like(selected_trj)
     obsr_cov = torch.linspace(.19, .2, number_of_obsr) * torch.eye(number_of_obsr)
     mvn = MultivariateNormal(torch.zeros(number_of_obsr),
                              obsr_cov)
-    observations = np.zeros((noisy_trj.shape[0], noisy_trj.shape[1], number_of_obsr))
+    observations = np.zeros((noisy_trj.shape[0], noisy_trj.shape[1], noisy_trj.shape[2]*number_of_obsr))
 
-    for state_dim in range(selected_trj.shape[1]):
-        noisy_trj[:,state_dim] = selected_trj[:,state_dim] + trj_noise_std* np.random.randn(selected_trj.shape[0])
-        observations[:,state_dim,:] = (noisy_trj[:,state_dim].reshape([-1,1]) +
-        np.linspace(.2,2,noisy_trj.shape[0]).reshape([-1,1])*mvn.sample((noisy_trj.shape[0],)).detach().numpy())
+    for state_dim in range(selected_trj.shape[-1]):
+        noisy_trj[:,:,state_dim] = selected_trj[:,:,state_dim] + trj_noise_std* np.random.randn(selected_trj.shape[0],selected_trj.shape[1])
+        observations[:,:,state_dim*number_of_obsr:(state_dim+1)*number_of_obsr] = (np.expand_dims(noisy_trj[:,:,state_dim],axis=-1) +
+        mvn.sample((noisy_trj.shape[0],noisy_trj.shape[1])).detach().numpy())
 
     plt.figure()
-
+    select_trj=3
+    aj=0
     for ii in range(number_of_obsr):
-        plt.scatter(observations[:, 0,:], observations[:, 1,:],marker='o', c='k',s=3, alpha=.1)
-    plt.plot(selected_trj[:, 0], selected_trj[:, 1],
+        plt.scatter(observations[select_trj,:, ii], observations[select_trj,:,ii+number_of_obsr],marker='o', c='k',s=3, alpha=.1)
+    plt.plot(selected_trj[select_trj,:, 0], selected_trj[select_trj,:, 1],
              'g', label='true trajectory')
-    plt.scatter(noisy_trj[:, 0], noisy_trj[:, 1], label='noisy state', marker='*', c='r', s=20)
+    plt.scatter(noisy_trj[select_trj,:, 0], noisy_trj[select_trj,:, 1], label='noisy state', marker='*', c='r', s=20)
 
     plt.legend()
-    plt.savefig('vis.png', dpi=500)
+    plt.savefig('vis_v2.png', dpi=500)
     print('Saved visualization figure at {}'.format('vis.png'))
     plt.show()
     spiral2d_dataset= {'state': noisy_trj,
@@ -139,5 +140,5 @@ if __name__ == "__main__":
              'state_noise_std':trj_noise_std,
              'observation_cov':obsr_cov}
 
-    pickle.dump(spiral2d_dataset, open("spiral2d_dataset.p", "wb"))
-    spiral2d_dataset_v2 = pickle.load(open("spiral2d_dataset.p", "rb"))
+    pickle.dump(spiral2d_dataset, open("spiral2d_dataset_v2.p", "wb"))
+    spiral2d_dataset_v2 = pickle.load(open("spiral2d_dataset_v2.p", "rb"))
