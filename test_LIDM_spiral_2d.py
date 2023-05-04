@@ -14,9 +14,9 @@ spiral2d_dataset = pickle.load(open("./spiral2d-dataset/spiral2d_dataset_v2.p", 
 #                     spiral2d_dataset['observation'][:,1,:].squeeze()], axis=-1)
 x = spiral2d_dataset['observation']
 z = spiral2d_dataset['state']
-''' normalization'''
-x = 2*(x-x.min(axis=0))/(x.max(axis=0)-x.min(axis=0))-1
-z = 2*(z-z.min(axis=0))/(z.max(axis=0)-z.min(axis=0))-1
+# ''' normalization'''
+# x = 2*(x-x.min(axis=0))/(x.max(axis=0)-x.min(axis=0))-1
+# z = 2*(z-z.min(axis=0))/(z.max(axis=0)-z.min(axis=0))-1
 
 device = torch.device('cpu')
 Dataset = get_dataset(x, z, device)
@@ -52,14 +52,14 @@ plt.plot(total_loss)
 plt.show()
 plt.figure()
 z=z.detach().cpu().numpy().squeeze()
-plt.plot(z[:,0], z[:,1], 'k')
-plt.scatter(z[:,0],z[:,1],marker='o', c='k',s=3, alpha=1)
-for ii in range(5):
-    z_hat = model(x)
-    z_hat=z_hat.detach().cpu().numpy().squeeze()
+plt.plot(z[:,0,0], z[:,0,1], 'k')
+plt.scatter(z[:,0,0],z[:,0,1],marker='o', c='k',s=3, alpha=1)
 
-    z_hat = 2*(z_hat-z_hat.min(axis=0))/(z_hat.max(axis=0)-z_hat.min(axis=0))-1
-    plt.plot(z_hat[:, 0], z_hat[:, 1])
-    plt.scatter(z_hat[:,0],z_hat[:,1],marker='o', c='r',s=3, alpha=1)
+z_hat=z_hat.detach().cpu().numpy().squeeze()
+for ii in range(z.shape[1]):
+
+    z_hat_i =z_hat[:,ii,:]# 2*(z_hat[:,ii,:]-z_hat[:,ii,:].min(axis=0))/(z_hat[:,ii,:].max(axis=0)-z_hat[:,ii,:].min(axis=0))-1
+    plt.plot(z_hat_i[:, 0], z_hat_i[:, 1])
+    plt.scatter(z_hat_i[:,0],z_hat_i[:,1],marker='o', c='r',s=3, alpha=1)
 
 plt.show()
