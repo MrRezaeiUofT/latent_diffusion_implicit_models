@@ -103,7 +103,7 @@ class f_phi(nn.Module):
         # cell = [n layers * n directions, batch size, out dim]
 
         prediction = self.fc_out(output.squeeze(0))
-
+        # prediction=torch.sqrt(self.alpha)*embedded_new+ torch.sqrt(1-self.alpha)*prediction
         # prediction = [batch size, output dim]
 
         return prediction, hidden, cell
@@ -117,7 +117,7 @@ class LIDM(nn.Module):
         self.sigma_x=torch.tensor([sigma_x], requires_grad=False ).to(self.device)
         self.sigma_z=torch.tensor([sigma_z], requires_grad=False ).to(self.device)
         self.alpha = torch.tensor([alpha], requires_grad=False).to(self.device)
-        self.n_layers=25
+        self.n_layers=15
         self.dp_rate=.1
         self.f_phi = f_phi(obser_dim=self.obser_dim,
                           latent_dim=self.latent_dim,
@@ -135,7 +135,7 @@ class LIDM(nn.Module):
                                 dropout=self.dp_rate)
 
 
-    def forward(self, obsrv):
+    def forward(self, obsrv, obsr_enable):
         # src = [src len, batch size]
         # trg = [trg len, batch size]
         # teacher_forcing_ratio is probability to use teacher forcing
@@ -145,7 +145,9 @@ class LIDM(nn.Module):
         seq_len = self.obsrv.shape[0]
 
         # tensor to store decoder outputs
-        self.outputs = torch.zeros(seq_len, batch_size, self.latent_dim).to(self.device)
+        self.z_hat = torch.zeros(seq_len, batch_size, self.latent_dim).to(self.device)
+        self.x_hat = torch.zeros(seq_len, batch_size, self.obser_dim).to(self.device)
+        self.z_x_hat=torch.zeros(seq_len, batch_size, self.latent_dim).to(self.device)
         # outputs_neural = torch.zeros(trg_len, batch_size, trg_vocab_size).to(self.device)
 
         # last hidden state of the encoder is used as the initial hidden state of the decoder
@@ -153,21 +155,30 @@ class LIDM(nn.Module):
         z= Variable(torch.randn((self.n_layers,batch_size, self.latent_dim))).to(self.device)
         cell=torch.zeros_like(z)
         for k in range(1, seq_len):
+            self.x_hat[k] = self.g_theta(self.z_hat[k-1].clone())#+self.sigma_x * torch.randn(self.x_hat[1].shape).to(self.device)
 
-            output, z, cell = self.f_phi(self.obsrv[k], z, cell)
+            if obsr_enable:
+                # output, z, cell = self.f_phi(self.obsrv[k]+self.sigma_x * torch.randn(self.x_hat[1].shape).to(self.device), z, cell)
+                output, z, cell = self.f_phi(
+                    self.obsrv[k] , z, cell)
+                self.z_x_hat[k] = self.f_phi.f_phi_x(self.obsrv[k])
+            else:
+                output, z, cell = self.f_phi(self.x_hat[k], z, cell)
+                self.z_x_hat[k] = self.f_phi.f_phi_x(self.x_hat[k].clone())
 
             # place predictions in a tensor holding predictions for each token
-            self.outputs[k] = output
+            self.z_hat[k] = output
 
-        self.x_hat=self.g_theta(self.outputs[:-1])
-        self.z_x_hat =self.f_phi.f_phi_x(self.x_hat)
-        return self.outputs
+
+
+        return self.z_hat
     def loss (self, a,b):
-        L1=F.mse_loss(self.x_hat, self.obsrv[1:])
-        L2=F.mse_loss(self.outputs[1:]-torch.sqrt(1-self.alpha)*self.outputs[:-1],
-                      torch.sqrt(self.alpha)*self.z_x_hat)
+        L1=F.mse_loss(self.x_hat[1:], self.obsrv[1:])/(self.obser_dim*torch.pow(self.sigma_x,2)+1e-4)
+        L2=F.mse_loss(self.z_hat[1:]-torch.sqrt(1-self.alpha)*self.z_hat[:-1],
+                      torch.sqrt(self.alpha)*self.z_x_hat[1:])/(torch.pow(self.sigma_z,2)+1e-4)
 
-        L= a*L2+ b*L1#*torch.pow(self.sigma_x,2)/(torch.pow(self.sigma_z,2)*torch.sqrt(self.alpha))
+        L= a*L2+ b*L1
+        print('L1=%f, L2=%f, L=%f'%(L1,L2,L))
         return L
 
 
