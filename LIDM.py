@@ -93,7 +93,7 @@ class f_phi(nn.Module):
         x_k=x_k.unsqueeze(0)
         embedded_new=self.f_phi_x(x_k)
         # embedded = [1, batch size, latent dim]
-        embedded_new= torch.sqrt(self.alpha)*embedded_new+self.sigma_x * torch.randn(embedded_new.shape).to(self.device) # + torch.sqrt(1-self.alpha)*hidden
+        embedded_new= embedded_new#+self.sigma_x * torch.randn(embedded_new.shape).to(self.device) # + torch.sqrt(1-self.alpha)*hidden
 
         # embedded_new = self.dropout(self.embedding_z(embedded_new))
         output, (hidden, cell) = self.rnn(embedded_new, (hidden,cell))
@@ -126,7 +126,7 @@ class LIDM(nn.Module):
                            sigma_x=self.sigma_x,
                            sigma_z=self.sigma_z,
                           dropout=self.dp_rate,
-                          bidirectional=False,
+                          bidirectional=True,
                            device=self.device)
 
         self.g_theta = g_theta( input_dim=self.latent_dim,
@@ -152,10 +152,11 @@ class LIDM(nn.Module):
 
         # last hidden state of the encoder is used as the initial hidden state of the decoder
 
-        z= Variable(torch.randn((self.n_layers,batch_size, self.latent_dim))).to(self.device)
+        z= Variable(torch.randn((2*self.n_layers,batch_size, self.latent_dim))).to(self.device)
+
         cell=torch.zeros_like(z)
         for k in range(1, seq_len):
-            self.x_hat[k] = self.g_theta(self.z_hat[k-1].clone())#+self.sigma_x * torch.randn(self.x_hat[1].shape).to(self.device)
+            self.x_hat[k] = self.g_theta(self.z_hat[k-1].clone())+self.sigma_x * torch.randn(self.x_hat[1].shape).to(self.device)
 
             if obsr_enable:
                 # output, z, cell = self.f_phi(self.obsrv[k]+self.sigma_x * torch.randn(self.x_hat[1].shape).to(self.device), z, cell)
@@ -174,8 +175,8 @@ class LIDM(nn.Module):
         return self.z_hat
     def loss (self, a,b):
         L1=F.mse_loss(self.x_hat[1:], self.obsrv[1:])/(self.obser_dim*torch.pow(self.sigma_x,2)+1e-4)
-        L2=F.mse_loss(self.z_hat[1:]-torch.sqrt(1-self.alpha)*self.z_hat[:-1],
-                      torch.sqrt(self.alpha)*self.z_x_hat[1:])/(torch.pow(self.sigma_z,2)+1e-4)
+        L2=F.mse_loss(self.z_hat[1:]-self.z_hat[:-1],
+                      self.z_x_hat[1:])/(torch.pow(self.sigma_z,2)+1e-4)
 
         L= a*L2+ b*L1
         print('L1=%f, L2=%f, L=%f'%(L1,L2,L))
