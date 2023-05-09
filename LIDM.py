@@ -24,9 +24,9 @@ class g_theta(nn.Module):
         self.input_dim=input_dim
         self.embedding = nn.Sequential(nn.Linear(input_dim, input_dim),
                                        nn.ReLU(True),
-                                       nn.Linear(input_dim, input_dim),
+                                       nn.Linear(input_dim, output_dim),
                                        nn.ReLU(True),
-                                       nn.Linear(input_dim, output_dim)
+                                       nn.Linear(output_dim, output_dim)
                                        )
         # self.rnn = nn.LSTM(input_dim, input_dim, n_layers, dropout=dropout, bidirectional =bidirectional )
         self.dropout = nn.Dropout(dropout)
@@ -44,10 +44,10 @@ class f_phi_x(nn.Module):
         self.output_dim = output_dim
         self.n_layers = n_layers
         self.input_dim=input_dim
-        self.embedding =  nn.Sequential(nn.Linear(input_dim, output_dim),
+        self.embedding =  nn.Sequential(nn.Linear(input_dim, input_dim),
                                         nn.ReLU(True),
                                         # nn.BatchNorm1d(output_dim),
-                                        nn.Linear(output_dim, output_dim),
+                                        nn.Linear(input_dim, output_dim),
                                         nn.ReLU(True),
                                         nn.Linear(output_dim, output_dim))
         self.dropout = nn.Dropout(dropout)
@@ -88,12 +88,12 @@ class f_phi(nn.Module):
 
     def forward(self, x_k, hidden, cell):
 
-        hidden=self.embedding_z(hidden)
-        hidden = hidden + self.sigma_z * torch.randn(hidden.shape).to(self.device)
+        # hidden=self.embedding_z(hidden)
+        # hidden = hidden #+ self.sigma_z * torch.randn(hidden.shape).to(self.device)
         x_k=x_k.unsqueeze(0)
         embedded_new=self.f_phi_x(x_k)
         # embedded = [1, batch size, latent dim]
-        embedded_new= torch.sqrt(self.alpha)*embedded_new+self.sigma_x * torch.randn(embedded_new.shape).to(self.device) # + torch.sqrt(1-self.alpha)*hidden
+        embedded_new= embedded_new#+self.sigma_x * torch.randn(embedded_new.shape).to(self.device)
 
         # embedded_new = self.dropout(self.embedding_z(embedded_new))
         output, (hidden, cell) = self.rnn(embedded_new, (hidden,cell))
@@ -117,7 +117,8 @@ class LIDM(nn.Module):
         self.sigma_x=torch.tensor([sigma_x], requires_grad=False ).to(self.device)
         self.sigma_z=torch.tensor([sigma_z], requires_grad=False ).to(self.device)
         self.alpha = torch.tensor([alpha], requires_grad=False).to(self.device)
-        self.n_layers=15
+        self.importance_sample_size= 100
+        self.n_layers=2
         self.dp_rate=.1
         self.f_phi = f_phi(obser_dim=self.obser_dim,
                           latent_dim=self.latent_dim,
@@ -126,7 +127,7 @@ class LIDM(nn.Module):
                            sigma_x=self.sigma_x,
                            sigma_z=self.sigma_z,
                           dropout=self.dp_rate,
-                          bidirectional=False,
+                          bidirectional=True,
                            device=self.device)
 
         self.g_theta = g_theta( input_dim=self.latent_dim,
@@ -136,11 +137,12 @@ class LIDM(nn.Module):
 
 
     def forward(self, obsrv, obsr_enable):
-        # src = [src len, batch size]
-        # trg = [trg len, batch size]
+        # obsrv = [src len, 1, obsr dim]
+        
         # teacher_forcing_ratio is probability to use teacher forcing
         # e.g. if teacher_forcing_ratio is 0.75 we use ground-truth inputs 75% of the time
-        self.obsrv = obsrv
+        self.obsrv = obsrv.repeat(1,self.importance_sample_size,1)
+
         batch_size = self.obsrv.shape[1]
         seq_len = self.obsrv.shape[0]
 
@@ -152,30 +154,39 @@ class LIDM(nn.Module):
 
         # last hidden state of the encoder is used as the initial hidden state of the decoder
 
-        z= Variable(torch.randn((self.n_layers,batch_size, self.latent_dim))).to(self.device)
-        cell=torch.zeros_like(z)
-        for k in range(1, seq_len):
-            self.x_hat[k] = self.g_theta(self.z_hat[k-1].clone())#+self.sigma_x * torch.randn(self.x_hat[1].shape).to(self.device)
+        # z= .5*Variable(torch.randn((2*self.n_layers,batch_size, self.latent_dim))).to(self.device)
+        self.z_hat[0] =.2*Variable(torch.randn(self.z_x_hat[0].shape)).to(self.device)
+        self.z_x_hat[0] =  self.f_phi.f_phi_x(self.x_hat[0].clone())
+        # cell=torch.zeros_like(z)
 
+        for k in range(1, seq_len):
             if obsr_enable:
-                # output, z, cell = self.f_phi(self.obsrv[k]+self.sigma_x * torch.randn(self.x_hat[1].shape).to(self.device), z, cell)
-                output, z, cell = self.f_phi(
-                    self.obsrv[k] , z, cell)
+                self.x_hat[k] = self.g_theta(self.z_hat[k-1].clone())+self.sigma_x * torch.randn(self.x_hat[1].shape).to(self.device)
+                # output, z, cell = self.f_phi(
+                #     self.obsrv[k] , z, cell)
                 self.z_x_hat[k] = self.f_phi.f_phi_x(self.obsrv[k])
+                self.z_hat[k] = (torch.sqrt(self.alpha) * self.z_x_hat[k] +
+                                 torch.sqrt(1 - self.alpha) * self.z_hat[k-1]+
+                                 self.sigma_z * torch.randn(self.z_hat[k-1].shape).to(self.device)  )
             else:
-                output, z, cell = self.f_phi(self.x_hat[k], z, cell)
+                self.x_hat[k] = self.g_theta(
+                    self.z_hat[k - 1].clone())+self.sigma_x * torch.randn(self.x_hat[1].shape).to(self.device)
+                # output, z, cell = self.f_phi(self.x_hat[k].clone(), z, cell)
                 self.z_x_hat[k] = self.f_phi.f_phi_x(self.x_hat[k].clone())
+                self.z_hat[k] = (torch.sqrt(self.alpha) * self.z_x_hat[k].clone() +
+                                 torch.sqrt(1 - self.alpha) * self.z_hat[k-1]+
+                                 self.sigma_z * torch.randn(self.z_hat[k-1].shape).to(self.device) )
 
             # place predictions in a tensor holding predictions for each token
-            self.z_hat[k] = output
+
 
 
 
         return self.z_hat
     def loss (self, a,b):
-        L1=F.mse_loss(self.x_hat[1:], self.obsrv[1:])/(self.obser_dim*torch.pow(self.sigma_x,2)+1e-4)
+        L1=F.mse_loss(self.x_hat[1:], self.obsrv[1:])/(self.obser_dim*torch.pow(self.sigma_x,2))
         L2=F.mse_loss(self.z_hat[1:]-torch.sqrt(1-self.alpha)*self.z_hat[:-1],
-                      torch.sqrt(self.alpha)*self.z_x_hat[1:])/(torch.pow(self.sigma_z,2)+1e-4)
+                      torch.sqrt(self.alpha)*self.z_x_hat[1:])/(self.latent_dim*torch.pow(self.sigma_z,2))
 
         L= a*L2+ b*L1
         print('L1=%f, L2=%f, L=%f'%(L1,L2,L))
@@ -199,7 +210,7 @@ class get_dataset(Dataset):
 
 def init_weights(m):
     for name, param in m.named_parameters():
-        nn.init.uniform_(param.data, -0.8, 0.8)
+        nn.init.uniform_(param.data, -0.08, 0.08)
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
