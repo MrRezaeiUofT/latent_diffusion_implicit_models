@@ -23,9 +23,13 @@ class g_theta(nn.Module):
 
         self.input_dim=input_dim
         self.embedding = nn.Sequential(nn.Linear(input_dim, output_dim),
-                                       nn.ReLU(True),
+                                       nn.LeakyReLU(),
                                        nn.Linear(output_dim, output_dim),
-                                       nn.ReLU(True),
+                                       nn.LeakyReLU(),
+                                       # nn.Linear(output_dim, output_dim),
+                                       # nn.LeakyReLU(),
+                                       nn.Linear(output_dim, output_dim),
+                                       nn.LeakyReLU(),
                                        nn.Linear(output_dim, output_dim)
                                        )
         # self.rnn = nn.LSTM(input_dim, input_dim, n_layers, dropout=dropout, bidirectional =bidirectional )
@@ -45,10 +49,13 @@ class f_phi_x(nn.Module):
         self.n_layers = n_layers
         self.input_dim=input_dim
         self.embedding =  nn.Sequential(nn.Linear(input_dim, input_dim),
-                                        nn.ReLU(True),
-                                        # nn.BatchNorm1d(output_dim),
+                                        nn.LeakyReLU(),
                                         nn.Linear(input_dim, input_dim),
-                                        nn.ReLU(True),
+                                        nn.LeakyReLU(),
+                                        # nn.Linear(input_dim, input_dim),
+                                        # nn.LeakyReLU(),
+                                        nn.Linear(input_dim, input_dim),
+                                        nn.LeakyReLU(),
                                         nn.Linear(input_dim, output_dim))
         self.dropout = nn.Dropout(dropout)
 
@@ -60,7 +67,7 @@ class f_phi_x(nn.Module):
         return embedded
 
 class f_phi(nn.Module):
-    def __init__(self, obser_dim, latent_dim, n_layers,alpha, sigma_x, sigma_z, dropout, bidirectional,device):
+    def __init__(self, obser_dim, latent_dim, n_layers,alpha, dropout, bidirectional,device):
         super().__init__()
         self.obser_dim = obser_dim
         self.device=device
@@ -68,8 +75,7 @@ class f_phi(nn.Module):
         self.n_layers = n_layers
         self.bidirectional = bidirectional
         self.alpha = alpha
-        self.sigma_x=sigma_x
-        self.sigma_z=sigma_z
+
         self.dropout=dropout
         self.f_phi_x= f_phi_x(input_dim=self.obser_dim,
                               output_dim=self.latent_dim,
@@ -77,21 +83,22 @@ class f_phi(nn.Module):
                               dropout=self.dropout
                               )
         if bidirectional:
-            self.fc_out = nn.Linear(2 * latent_dim, latent_dim)
+            self.fc_out = nn.Linear(2 * (latent_dim+obser_dim), (latent_dim))
         else:
-            self.fc_out = nn.Linear(latent_dim, latent_dim)
+            self.fc_out = nn.Linear((latent_dim+obser_dim), (latent_dim))
 
-        self.embedding_z = nn.Linear(latent_dim, latent_dim)
-        self.rnn = nn.GRU(latent_dim, latent_dim, n_layers, dropout=dropout, bidirectional =bidirectional )
+        self.embedding_z = nn.Linear((latent_dim+obser_dim), (latent_dim))
+        self.rnn = nn.GRU((latent_dim+obser_dim), (latent_dim+obser_dim), n_layers, dropout=dropout, bidirectional =bidirectional )
 
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x_k, hidden, cell):
+    def forward(self, z_x_k,x_k, hidden, cell):
 
         # hidden=self.embedding_z(hidden)
         # hidden = hidden #+ self.sigma_z * torch.randn(hidden.shape).to(self.device)
-        x_k=x_k.unsqueeze(0)
-        embedded_new=self.f_phi_x(x_k)
+        z_x_k=z_x_k.unsqueeze(0)
+        x_k = x_k.unsqueeze(0)
+        embedded_new=torch.concat([z_x_k,x_k], dim=-1)
         # embedded = [1, batch size, latent dim]
         # embedded_new= embedded_new#+self.sigma_x * torch.randn(embedded_new.shape).to(self.device)
 
@@ -109,23 +116,22 @@ class f_phi(nn.Module):
         return prediction, hidden, cell
 
 class LIDM(nn.Module):
-    def __init__(self, latent_dim, obser_dim, sigma_x, sigma_z, alpha, device):
+    def __init__(self, latent_dim, obser_dim, sigma_x, alpha,time_lenth, device):
         super().__init__()
-        self.latent_dim=latent_dim
-        self.obser_dim =obser_dim
-        self.device=device
-        self.sigma_x=torch.tensor([sigma_x], requires_grad=False ).to(self.device)
-        self.sigma_z=torch.tensor([sigma_z], requires_grad=False ).to(self.device)
+        self.device = device
+        self.latent_dim=torch.tensor([latent_dim], requires_grad=False).to(self.device)
+        self.obser_dim =torch.tensor([obser_dim], requires_grad=False).to(self.device)
+
+        self.sigma_x=torch.tensor(sigma_x*torch.ones(time_lenth), requires_grad=True).to(self.device)
+
         self.alpha = torch.tensor([alpha], requires_grad=False).to(self.device)
         self.importance_sample_size= 20
-        self.n_layers=5
+        self.n_layers=10
         self.dp_rate=.0
         self.f_phi = f_phi(obser_dim=self.obser_dim,
                           latent_dim=self.latent_dim,
                           n_layers= self.n_layers,
                            alpha=self.alpha,
-                           sigma_x=self.sigma_x,
-                           sigma_z=self.sigma_z,
                           dropout=self.dp_rate,
                           bidirectional=True,
                            device=self.device)
@@ -154,29 +160,33 @@ class LIDM(nn.Module):
 
         # last hidden state of the encoder is used as the initial hidden state of the decoder
 
-        z=0*Variable(torch.randn((2*self.n_layers,batch_size, self.latent_dim))).to(self.device)
-        self.z_hat[0] =1*Variable(torch.randn(self.z_x_hat[0].shape)).to(self.device)
-        self.z_x_hat[0] =  self.f_phi.f_phi_x(self.x_hat[0]+ self.sigma_x * torch.randn(self.obsrv[0].shape).to(self.device))
+        z=.0*Variable(torch.randn((2*self.n_layers,batch_size, self.latent_dim+self.obser_dim))).to(self.device)
+        self.z_hat[0] =.1*Variable(torch.randn(self.z_x_hat[0].shape)).to(self.device)
+        self.z_x_hat[0] =  self.f_phi.f_phi_x(self.x_hat[0]+ self.sigma_x[0] * torch.randn(self.obsrv[0].shape).to(self.device))
         cell=torch.zeros_like(z)
         output=self.z_hat[0]
         for k in range(1, seq_len):
+            eps_z= self.alpha*self.sigma_x[k] * torch.randn(self.z_hat[0].shape).to(self.device)
+            eps_x=self.sigma_x[k] * torch.randn( self.x_hat[0].shape).to(self.device)
             if obsr_enable:
-                self.x_hat[k] = self.g_theta(output+self.sigma_z * torch.randn(output.shape).to(self.device))  #
+                temp = self.g_theta(output.clone())+eps_x #+
+                self.x_hat[k]=temp
+                self.z_x_hat[k] = self.f_phi.f_phi_x(self.obsrv[k])+ eps_z
                 output, z, cell = self.f_phi(
-                    self.obsrv[k] , z, cell)
-                self.z_x_hat[k] = self.f_phi.f_phi_x(self.obsrv[k]+ self.sigma_x * torch.randn(self.obsrv[k].shape).to(self.device))
+                    self.z_x_hat[k].clone(),temp, z, cell)
                 # self.z_hat[k] = (torch.sqrt(self.alpha) * self.z_x_hat[k] +
                 #                  torch.sqrt(1 - self.alpha) * self.z_hat[k-1]+
                 #                  self.sigma_z * torch.randn(self.z_hat[k-1].shape).to(self.device)  )
-                self.z_hat[k]=output#+  self.sigma_z * torch.randn(output.shape).to(self.device)
+                self.z_hat[k]=output.clone()#+  self.sigma_z * torch.randn(output.shape).to(self.device)
 
 
             else:
 
-                temp = self.g_theta(output + self.sigma_z * torch.randn(output.shape).to(self.device))
+                temp = self.g_theta(output)+ eps_x#+ self.sigma_x * torch.randn(self.x_hat[k].shape).to(self.device)
                 self.x_hat[k]=temp
-                output, z, cell = self.f_phi(self.x_hat[k].clone(), z, cell)
-                self.z_x_hat[k] = self.f_phi.f_phi_x(temp+  self.sigma_x * torch.randn(temp.shape).to(self.device))
+
+                self.z_x_hat[k] = self.f_phi.f_phi_x(temp)+  eps_z
+                output, z, cell = self.f_phi(self.z_x_hat[k],temp, z, cell)
                 # self.z_hat[k] = (torch.sqrt(self.alpha) * self.z_x_hat[k].clone() +
                 #                  torch.sqrt(1 - self.alpha) * self.z_hat[k-1]+
                 #                  self.sigma_z * torch.randn(self.z_hat[k-1].shape).to(self.device) )
@@ -189,11 +199,11 @@ class LIDM(nn.Module):
 
         return self.z_hat
     def loss (self, a,b):
-        L1=F.mse_loss(self.x_hat, self.obsrv)/(self.obser_dim*torch.pow(self.sigma_z,2))
+        L1=F.mse_loss(self.x_hat, self.obsrv)#
         L2=F.mse_loss(torch.diff(self.z_hat,dim=0),
-                      self.z_x_hat[1:])/(self.latent_dim*torch.pow(self.sigma_x,2))
+                      self.z_x_hat[1:])/(torch.pow(self.alpha,2))#*torch.pow(self.sigma_z[1:],2)+1e-4)
 
-        L= a*L2+ b*L1
+        L= b*L2+ a*L1
         print('L1=%f, L2=%f, L=%f'%(L1,L2,L))
         return L
 
