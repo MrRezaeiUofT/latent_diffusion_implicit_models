@@ -108,7 +108,7 @@ if __name__ == "__main__":
     samp_ts = torch.from_numpy(samp_ts).float().to(device)
     number_of_obsr = 30
     trj_noise_std = .05
-    selected_trj = orig_trajs
+    selected_trj = orig_trajs- orig_trajs[:,0,2]
     noisy_trj = np.zeros_like(selected_trj)
     obsr_cov = torch.linspace(.19, .2, number_of_obsr) * torch.eye(number_of_obsr)
     mvn = MultivariateNormal(torch.zeros(number_of_obsr),

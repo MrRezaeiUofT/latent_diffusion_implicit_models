@@ -108,7 +108,9 @@ if __name__ == "__main__":
     samp_ts = torch.from_numpy(samp_ts).float().to(device)
     number_of_obsr = 30
     trj_noise_std = .05
+
     selected_trj = orig_trajs[4]
+    selected_trj=selected_trj-selected_trj[0,:]
     noisy_trj = np.zeros_like(selected_trj)
     obsr_cov = torch.linspace(.19, .2, number_of_obsr) * torch.eye(number_of_obsr)
     mvn = MultivariateNormal(torch.zeros(number_of_obsr),
@@ -118,7 +120,7 @@ if __name__ == "__main__":
     for state_dim in range(selected_trj.shape[1]):
         noisy_trj[:,state_dim] = selected_trj[:,state_dim] + trj_noise_std* np.random.randn(selected_trj.shape[0])
         observations[:,state_dim,:] = (noisy_trj[:,state_dim].reshape([-1,1]) +
-        np.linspace(.2,2,noisy_trj.shape[0]).reshape([-1,1])*mvn.sample((noisy_trj.shape[0],)).detach().numpy())
+        np.linspace(.8,1,noisy_trj.shape[0]).reshape([-1,1])*mvn.sample((noisy_trj.shape[0],)).detach().numpy())
 
     plt.figure()
 
