@@ -26,7 +26,7 @@ t=dataset_2['t'].reshape([-1,1])
 device = torch.device('cuda')
 Dataset = get_dataset(x, z, device)
 Dataset_loader = DataLoader(Dataset, batch_size=x.shape[0],shuffle=False)
-model = LIDM(latent_dim=z.shape[1], obser_dim=x.shape[1], sigma_x=.5,alpha=.1,
+model = LIDM(latent_dim=z.shape[1], obser_dim=x.shape[1], sigma_x=.1,alpha=.2,
              time_lenth=x.shape[0], device=device).to(device)
 model.apply(init_weights)
 print(f'The g_theta model has {count_parameters(model.g_theta):,} trainable parameters')
@@ -36,7 +36,7 @@ print(f'The LIDM model has {count_parameters(model):,} trainable parameters')
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 CLIP = 1
 total_loss=[]
-Numb_Epochs=400
+Numb_Epochs=10
 for epoch in range(Numb_Epochs):
     epoch_loss = 0
     for i, batch in enumerate(Dataset_loader):

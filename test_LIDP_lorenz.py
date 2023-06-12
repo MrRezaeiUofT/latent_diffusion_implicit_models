@@ -25,7 +25,7 @@ Spikes = Lorenz_dataset['Spikes'][:]
 Spikes = np.delete( Spikes,np.where(Spikes.sum(axis=0)<10)[0] , axis=1)
 Spikes = gaussian_kernel_smoother(Spikes,2,6)
 # x =(Spikes -np.mean(Spikes,axis=0))/np.std(Spikes,axis=0)
-x = Spikes#calDesignMatrix_V2(Spikes,2+1).squeeze()
+x = calDesignMatrix_V2(Spikes,1+1).squeeze()
 #
 # number_of_observations=10
 # ''' Normal dist. observations'''
@@ -39,8 +39,9 @@ x = Spikes#calDesignMatrix_V2(Spikes,2+1).squeeze()
 #     x[:,state_dim*number_of_observations:(state_dim+1)*number_of_observations] = np.expand_dims(z[:,state_dim], axis=-1) +\
 #                                                                    mvn.sample((z.shape[0],)).detach().numpy()
 # def shuffle_along_axis(a, axis):
-#     idx = np.random.rand(*a.shape).argsort(axis=axis)
-#     return np.take_along_axis(a,idx,axis=axis)
+#     idx = np.arange(a.shape[axis])
+#     np.random.shuffle(idx)
+#     return a[:,idx]
 # x=shuffle_along_axis(x,1)
 #######################################
 
@@ -50,7 +51,7 @@ z = 2*(z-z.min(axis=0))/(z.max(axis=0)-z.min(axis=0))-1
 device = torch.device('cuda')
 Dataset = get_dataset(x, z, device)
 Dataset_loader = DataLoader(Dataset, batch_size=x.shape[0],shuffle=False)
-model = LIDM(latent_dim=z.shape[1], obser_dim=x.shape[1], sigma_x=.3, alpha=.1,
+model = LIDM(latent_dim=z.shape[1], obser_dim=x.shape[1], sigma_x=.2, alpha=.1,
              importance_sample_size=1, n_layers=2, device=device).to(device)
 model.apply(init_weights)
 print(f'The g_theta model has {count_parameters(model.g_theta):,} trainable parameters')
@@ -60,7 +61,7 @@ print(f'The LIDM model has {count_parameters(model):,} trainable parameters')
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 CLIP = 1
 total_loss=[]
-Numb_Epochs=500
+Numb_Epochs=1000
 for epoch in range(Numb_Epochs):
     epoch_loss = 0
     for i, batch in enumerate(Dataset_loader):
@@ -103,8 +104,9 @@ plt.show()
 z = z.detach().cpu().numpy().squeeze()
 # plt.figure()
 f, axes = plt.subplots(3, 1, sharex=True, sharey=False)
-# ax = plt.axes(projection='3d')
-trj_samples=np.random.randint(0, 1,5)
+# ff=plt.figure()
+# ax = ff.axes(projection='3d')
+trj_samples=np.random.randint(0, 1,1)
 for ii in trj_samples:
     z_hat = model(x, True)
     z_hat = z_hat.detach().cpu().numpy().squeeze()[1:,:]
@@ -146,8 +148,8 @@ print('F-theta-with-obsr-cc=%f,mse=%f,mae=%f'%(get_metrics(z, z_x_hat)))
 
 # plt.figure()
 f, axes = plt.subplots(3, 1, sharex=True, sharey=False)
-# plt.figure()
-# ax = plt.axes(projection='3d')
+# ff= plt.figure()
+# ax = ff.axes(projection='3d')
 for ii in trj_samples:
     z_hat = model(x, False)
     z_hat = z_hat.detach().cpu().numpy().squeeze()[1:,:]

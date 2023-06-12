@@ -5,6 +5,7 @@
       <module fileurl="file://$PROJECT_DIR$/Sandbox/.idea/Sandbox.iml" filepath="$PROJECT_DIR$/Sandbox/.idea/Sandbox.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/latent_diffusion_implicit_models.iml" filepath="$PROJECT_DIR$/.idea/latent_diffusion_implicit_models.iml" />
       <module fileurl="file://$PROJECT_DIR$/../my_inference_ws/.idea/my_inference_ws.iml" filepath="$PROJECT_DIR$/../my_inference_ws/.idea/my_inference_ws.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../neurallatents.github.io/.idea/neurallatents.github.io.iml" filepath="$PROJECT_DIR$/../neurallatents.github.io/.idea/neurallatents.github.io.iml" />
       <module fileurl="file://$PROJECT_DIR$/spiral2d-dataset/.idea/spiral2d-dataset.iml" filepath="$PROJECT_DIR$/spiral2d-dataset/.idea/spiral2d-dataset.iml" />
     </modules>
   </component>
