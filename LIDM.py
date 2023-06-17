@@ -181,13 +181,13 @@ class LIDM(nn.Module):
         return self.z_hat
 
 
-    def loss (self, a,b):
+    def loss (self, a,b,c,z):
         L1=F.mse_loss(self.x_hat, self.obsrv)/(torch.pow(self.alpha,2))
         L2=F.mse_loss(torch.diff(self.z_hat,dim=0),
                       self.z_x_hat[1:])*(torch.pow(self.alpha,2))#*torch.pow(self.sigma_z[1:],2)+1e-4)
-
-        L= b*L2+ a*L1
-        print('L1=%f, L2=%f, L=%f'%(L1,L2,L))
+        L3=F.mse_loss(z,self.z_hat)
+        L= b*L2+ a*L1 + c*L3
+        print('L1=%f, L2=%f, L3=%f, L=%f'%(L1,L2,L3,L))
         return L
 
 
@@ -205,6 +205,18 @@ class get_dataset(Dataset):
     def __getitem__(self, index):
         return [self.x[index], self.z[index]]
 
+class get_dataset_HC(Dataset):
+
+    ''' create a dataset suitable for pytorch models'''
+    def __init__(self, x,z, device):
+        self.x = torch.tensor(x, dtype=torch.float32).to(device)
+        self.z = torch.tensor(z, dtype=torch.float32).to(device)
+
+    def __len__(self):
+        return self.x.shape[1]
+
+    def __getitem__(self, index):
+        return [self.x[:,index,:], self.z[:,index,:]]
 
 def init_weights(m):
     for name, param in m.named_parameters():

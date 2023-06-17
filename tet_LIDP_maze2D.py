@@ -81,7 +81,7 @@ print(f'The LIDM model has {count_parameters(model):,} trainable parameters')
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 CLIP = 1
 total_loss = []
-Numb_Epochs = 700
+Numb_Epochs = 1
 for epoch in range(Numb_Epochs):
     epoch_loss = 0
     for i, batch in enumerate(Dataset_loader):

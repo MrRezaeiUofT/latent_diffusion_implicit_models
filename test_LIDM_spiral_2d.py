@@ -34,7 +34,7 @@ print(f'The LIDM model has {count_parameters(model):,} trainable parameters')
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 CLIP = 1
 total_loss=[]
-Numb_Epochs=1000
+Numb_Epochs=500
 for epoch in range(Numb_Epochs):
     epoch_loss = 0
     for i, batch in enumerate(Dataset_loader):
@@ -45,7 +45,7 @@ for epoch in range(Numb_Epochs):
         optimizer.zero_grad()
         z_hat = model(x,True)
         print('epoch=%d/%d'%(epoch,Numb_Epochs))
-        loss=model.loss(a=1,b=1)
+        loss=model.loss(a=1,b=1,c=10,z=z)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), CLIP)
         optimizer.step()
