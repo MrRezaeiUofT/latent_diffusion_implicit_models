@@ -37,12 +37,15 @@ def preprocess_HC(x_in,z_in,downsample_rate, episod_len):
     return x_new,z_new
 [x_tr,z_tr]= preprocess_HC(dataset['X_trian'],dataset['Y_trian'][:, :2], 5,200)
 [x_val,z_val]= preprocess_HC(dataset['X_valid'],dataset['Y_valid'][:, :2], 5,200)
+[x_test,z_test]= preprocess_HC(dataset['X_test'],dataset['Y_test'][:, :2], 5,200)
 ''''''
 device = torch.device('cuda')
 Dataset = get_dataset_HC(x_tr, z_tr, device)
 Dataset_val = get_dataset_HC(x_val, z_val, device)
+Dataset_test = get_dataset_HC(x_test, z_test, device)
 Dataset_loader = DataLoader(Dataset, batch_size=batch_size,shuffle=False)
 Dataset_val_loader = DataLoader(Dataset_val, batch_size=z_val.shape[1],shuffle=False)
+Dataset_test_loader = DataLoader(Dataset_test, batch_size=z_test.shape[1],shuffle=False)
 model = LIDM(latent_dim=z_tr.shape[-1], obser_dim=x_tr.shape[-1], sigma_x=.1,alpha=1, importance_sample_size=1, n_layers=2,
               device=device).to(device)
 model.apply(init_weights)
@@ -56,27 +59,27 @@ optimizer = optim.Adam(model.parameters(), lr=1e-3)
 CLIP = 1
 total_loss=[]
 Numb_Epochs=1000
-for epoch in range(Numb_Epochs):
-    epoch_loss = 0
-    for i, batch in enumerate(Dataset_loader):
-        x, z = batch
-        x= torch.swapaxes(x, 0,1)
-        z = torch.swapaxes(z, 0,1)
-
-        optimizer.zero_grad()
-        z_hat = model(x,True)
-        print('epoch=%d/%d'%(epoch,Numb_Epochs))
-        loss=model.loss(a=1,b=1,c=1000,z=z)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), CLIP)
-        optimizer.step()
-        epoch_loss += loss.item()
-    total_loss.append(epoch_loss)
-
-''' save and load models'''
-torch.save(model.state_dict(), 'fffinal_model_HC_1mc_1000.pt')
+# for epoch in range(Numb_Epochs):
+#     epoch_loss = 0
+#     for i, batch in enumerate(Dataset_loader):
+#         x, z = batch
+#         x= torch.swapaxes(x, 0,1)
+#         z = torch.swapaxes(z, 0,1)
 #
-# model.load_state_dict(torch.load('final_model_HC_1mc_1000.pt'))
+#         optimizer.zero_grad()
+#         z_hat = model(x,True)
+#         print('epoch=%d/%d'%(epoch,Numb_Epochs))
+#         loss=model.loss(a=1,b=1,c=1000,z=z)
+#         loss.backward()
+#         torch.nn.utils.clip_grad_norm_(model.parameters(), CLIP)
+#         optimizer.step()
+#         epoch_loss += loss.item()
+#     total_loss.append(epoch_loss)
+#
+# ''' save and load models'''
+# torch.save(model.state_dict(), 'final_model_HC_5mc_1000_V2.pt')
+#
+model.load_state_dict(torch.load('final_model_HC_5mc_1000_V2.pt'))
 ''''''
 
 import matplotlib.pyplot as plt
@@ -120,6 +123,32 @@ for ii in trj_samples:
 
 """ validation result """
 for i, batch in enumerate(Dataset_val_loader):
+    x, z = batch
+    x = torch.swapaxes(x, 0, 1)
+z = z.detach().cpu().numpy().squeeze()
+
+trj_samples = np.arange(z_val.shape[1])
+for ii in trj_samples:
+    f, axes = plt.subplots(2, 1, sharex=True, sharey=False)
+    for num_rep in range(max_numb_repret):
+        z_hat = model(x, True)
+        z_hat = z_hat.detach().cpu().numpy().squeeze()[1:,ii, :]
+
+        z_hat = 2 * (z_hat - z_hat.min(axis=0)) / (z_hat.max(axis=0) - z_hat.min(axis=0)) - 1
+
+        axes[0].plot(z_hat[:, 0].squeeze(), 'r')
+        axes[1].plot(z_hat[:, 1].squeeze(), 'r')
+    axes[0].plot(z[ii,1:, 0].squeeze(), 'k')
+    axes[1].plot(z[ii,1:, 1].squeeze(), 'k')
+
+    plt.title('with observations')
+    plt.savefig(save_result_path + 'Val-'+str(ii)+'-HC-with-obsr.png')
+    plt.savefig(save_result_path + 'Val-'+str(ii)+'-HC-with-obsr.svg', format='svg')
+    # plt.close()
+
+
+""" Test result """
+for i, batch in enumerate(Dataset_test_loader):
     x, z = batch
     x = torch.swapaxes(x, 0, 1)
 z = z.detach().cpu().numpy().squeeze()
