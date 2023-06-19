@@ -99,7 +99,7 @@ for i, batch in enumerate(Dataset_loader):
     z = torch.swapaxes(z, 0, 1)
 
 z = z.detach().cpu().numpy().squeeze()
-max_numb_repret=5
+max_numb_repret=15
 trj_samples = np.arange(0, z.shape[1])
 for ii in trj_samples:
     f, axes = plt.subplots(2, 1, sharex=True, sharey=False)
