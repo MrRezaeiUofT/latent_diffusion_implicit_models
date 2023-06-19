@@ -155,7 +155,7 @@ class LIDM(nn.Module):
 
         # last hidden state of the encoder is used as the initial hidden state of the decoder
 
-        z=0*Variable(torch.randn((2*self.n_layers,batch_size, self.latent_dim))).to(self.device)
+        z= self.sigma_x*Variable(torch.randn((2*self.n_layers,batch_size, self.latent_dim))).to(self.device)
         self.z_hat[0] =  self.sigma_x*Variable(torch.randn(self.z_x_hat[0].shape)).to(self.device)
         cell=torch.zeros_like(z)
         output=self.z_hat[0]
@@ -182,9 +182,9 @@ class LIDM(nn.Module):
 
 
     def loss (self, a,b,c,z):
-        L1=F.mse_loss(self.x_hat, self.obsrv)/(torch.pow(self.alpha,2))
+        L1=F.mse_loss(self.x_hat, self.obsrv)*(torch.pow(self.alpha,2))
         L2=F.mse_loss(torch.diff(self.z_hat,dim=0),
-                      self.z_x_hat[1:])*(torch.pow(self.alpha,2))#*torch.pow(self.sigma_z[1:],2)+1e-4)
+                      self.z_x_hat[1:])#*(torch.pow(self.alpha,2))#*torch.pow(self.sigma_z[1:],2)+1e-4)
         L3=F.mse_loss(z,self.z_hat)
         L= b*L2+ a*L1 + c*L3
         print('L1=%f, L2=%f, L3=%f, L=%f'%(L1,L2,L3,L))
