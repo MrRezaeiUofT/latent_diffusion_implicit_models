@@ -58,26 +58,26 @@ print(f'The LIDM model has {count_parameters(model):,} trainable parameters')
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 CLIP = 1
 total_loss=[]
-Numb_Epochs=1000
-for epoch in range(Numb_Epochs):
-    epoch_loss = 0
-    for i, batch in enumerate(Dataset_loader):
-        x, z = batch
-        x= torch.swapaxes(x, 0,1)
-        z = torch.swapaxes(z, 0,1)
-
-        optimizer.zero_grad()
-        z_hat = model(x,True)
-        print('epoch=%d/%d'%(epoch,Numb_Epochs))
-        loss=model.loss(a=1,b=1,c=1000,z=z)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), CLIP)
-        optimizer.step()
-        epoch_loss += loss.item()
-    total_loss.append(epoch_loss)
+# Numb_Epochs=1000
+# for epoch in range(Numb_Epochs):
+#     epoch_loss = 0
+#     for i, batch in enumerate(Dataset_loader):
+#         x, z = batch
+#         x= torch.swapaxes(x, 0,1)
+#         z = torch.swapaxes(z, 0,1)
+#
+#         optimizer.zero_grad()
+#         z_hat = model(x,True)
+#         print('epoch=%d/%d'%(epoch,Numb_Epochs))
+#         loss=model.loss(a=1,b=1,c=1000,z=z)
+#         loss.backward()
+#         torch.nn.utils.clip_grad_norm_(model.parameters(), CLIP)
+#         optimizer.step()
+#         epoch_loss += loss.item()
+#     total_loss.append(epoch_loss)
 
 ''' save and load models'''
-torch.save(model.state_dict(), 'final_model_SS_5mc_1000_V2.pt')
+# torch.save(model.state_dict(), 'final_model_SS_5mc_1000_V2.pt')
 #
 model.load_state_dict(torch.load('final_model_SS_5mc_1000_V2.pt'))
 ''''''
@@ -85,7 +85,8 @@ model.load_state_dict(torch.load('final_model_SS_5mc_1000_V2.pt'))
 import matplotlib.pyplot as plt
 
 ''' visualization'''
-
+from metrics import get_R2
+from metrics import get_rho
 model.sigma_x=torch.Tensor([.5]).to(device)
 save_result_path = 'Results/'
 # plt.figure()
@@ -101,6 +102,8 @@ for i, batch in enumerate(Dataset_loader):
 z = z.detach().cpu().numpy().squeeze()
 max_numb_repret=15
 trj_samples = np.arange(0, z.shape[1])
+r2_tr=[]
+rho_tr=[]
 for ii in trj_samples:
     f, axes = plt.subplots(2, 1, sharex=True, sharey=False)
     for num_rep in range(max_numb_repret):
@@ -117,11 +120,16 @@ for ii in trj_samples:
     plt.title('with observations')
     plt.savefig(save_result_path + 'Train-'+str(ii)+'-SS-with-obsr.png')
     plt.savefig(save_result_path + 'Train-'+str(ii)+'-SS-with-obsr.svg', format='svg')
-    # plt.colse()
+    rho_tr.append(np.mean(np.abs(get_rho(z[1:, ii,:].squeeze(),z_hat.squeeze()))))
+    r2_tr.append(np.mean(np.abs(get_R2(z[1:, ii, :].squeeze(), z_hat.squeeze()))))
+print('train rho-mean=%f, std=%f' % (np.mean(rho_tr), np.std(rho_tr)))
+print('train R2-mean=%f, std=%f' % (np.mean(r2_tr), np.std(r2_tr)))
 
 
 
 """ validation result """
+r2_val=[]
+rho_val=[]
 for i, batch in enumerate(Dataset_val_loader):
     x, z = batch
     x = torch.swapaxes(x, 0, 1)
@@ -144,10 +152,15 @@ for ii in trj_samples:
     plt.title('with observations')
     plt.savefig(save_result_path + 'Val-'+str(ii)+'-SS-with-obsr.png')
     plt.savefig(save_result_path + 'Val-'+str(ii)+'-SS-with-obsr.svg', format='svg')
-    # plt.close()
+    rho_val.append(np.mean(np.abs(get_rho(z[ii, 1:, :].squeeze(), z_hat.squeeze()))))
+    r2_val.append(np.mean(np.abs(get_R2(z[ii, 1:, :].squeeze(), z_hat.squeeze()))))
+print('val rho-mean=%f, std=%f' % (np.mean(rho_val), np.std(rho_val)))
+print('val R2-mean=%f, std=%f' % (np.mean(r2_val), np.std(r2_val)))
 
 
 """ Test result """
+r2_te=[]
+rho_te=[]
 for i, batch in enumerate(Dataset_test_loader):
     x, z = batch
     x = torch.swapaxes(x, 0, 1)
@@ -170,5 +183,8 @@ for ii in trj_samples:
     plt.title('with observations')
     plt.savefig(save_result_path + 'Test-'+str(ii)+'-SS-with-obsr.png')
     plt.savefig(save_result_path + 'Test-'+str(ii)+'-SS-with-obsr.svg', format='svg')
-    # plt.close()
+    rho_te.append(np.mean(np.abs(get_rho(z[ii, 1:, :].squeeze(), z_hat.squeeze()))))
+    r2_te.append(np.mean(np.abs(get_R2(z[ii, 1:, :].squeeze(), z_hat.squeeze()))))
+print('test rho-mean=%f, std=%f' % (np.mean(rho_te), np.std(rho_te)))
+print('test R2-mean=%f, std=%f' % (np.mean(r2_te), np.std(r2_te)))
 

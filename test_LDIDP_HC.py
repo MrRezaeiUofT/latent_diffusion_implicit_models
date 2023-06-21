@@ -75,9 +75,9 @@ Numb_Epochs=1000
 #         optimizer.step()
 #         epoch_loss += loss.item()
 #     total_loss.append(epoch_loss)
-#
-# ''' save and load models'''
-# torch.save(model.state_dict(), 'final_model_HC_5mc_1000_V2.pt')
+
+''' save and load models'''
+# torch.save(model.state_dict(), 'v_final_model_HC_5mc_1000_V2.pt')
 #
 model.load_state_dict(torch.load('final_model_HC_5mc_1000_V2.pt'))
 ''''''
@@ -85,13 +85,16 @@ model.load_state_dict(torch.load('final_model_HC_5mc_1000_V2.pt'))
 import matplotlib.pyplot as plt
 
 ''' visualization'''
-
+#Import metrics
+from metrics import get_R2
+from metrics import get_rho
 model.sigma_x=torch.Tensor([.5]).to(device)
 save_result_path = 'Results/'
 # plt.figure()
 # plt.plot(total_loss)
 # plt.show()
-
+r2_tr=[]
+rho_tr=[]
 Dataset_loader = DataLoader(Dataset, batch_size=z_tr.shape[1],shuffle=False)
 for i, batch in enumerate(Dataset_loader):
     x, z = batch
@@ -117,11 +120,17 @@ for ii in trj_samples:
     plt.title('with observations')
     plt.savefig(save_result_path + 'Train-'+str(ii)+'-HC-with-obsr.png')
     plt.savefig(save_result_path + 'Train-'+str(ii)+'-HC-with-obsr.svg', format='svg')
+    rho_tr.append(np.mean(np.abs(get_rho(z[1:, ii,:].squeeze(),z_hat.squeeze()))))
+    r2_tr.append(np.mean(np.abs(get_R2(z[1:, ii, :].squeeze(), z_hat.squeeze()))))
+print('train rho-mean=%f, std=%f'%(np.mean(rho_tr),np.std(rho_tr)))
+print('train R2-mean=%f, std=%f' % (np.mean(r2_tr), np.std(r2_tr)))
     # plt.colse()
 
 
 
 """ validation result """
+r2_val=[]
+rho_val=[]
 for i, batch in enumerate(Dataset_val_loader):
     x, z = batch
     x = torch.swapaxes(x, 0, 1)
@@ -144,10 +153,16 @@ for ii in trj_samples:
     plt.title('with observations')
     plt.savefig(save_result_path + 'Val-'+str(ii)+'-HC-with-obsr.png')
     plt.savefig(save_result_path + 'Val-'+str(ii)+'-HC-with-obsr.svg', format='svg')
+    rho_val.append(np.mean(np.abs(get_rho(z[ii,1:, :].squeeze(), z_hat.squeeze()))))
+    r2_val.append(np.mean(np.abs(get_R2(z[ii,1:, :].squeeze(), z_hat.squeeze()))))
+print('val rho-mean=%f, std=%f' % (np.mean(rho_val), np.std(rho_val)))
+print('val R2-mean=%f, std=%f' % (np.mean(r2_val), np.std(r2_val)))
     # plt.close()
 
 
 """ Test result """
+r2_te=[]
+rho_te=[]
 for i, batch in enumerate(Dataset_test_loader):
     x, z = batch
     x = torch.swapaxes(x, 0, 1)
@@ -170,5 +185,9 @@ for ii in trj_samples:
     plt.title('with observations')
     plt.savefig(save_result_path + 'Test-'+str(ii)+'-HC-with-obsr.png')
     plt.savefig(save_result_path + 'Test-'+str(ii)+'-HC-with-obsr.svg', format='svg')
+    rho_te.append(np.mean(np.abs(get_rho(z[ii, 1:, :].squeeze(), z_hat.squeeze()))))
+    r2_te.append(np.mean(np.abs(get_R2(z[ii, 1:, :].squeeze(), z_hat.squeeze()))))
+print('test rho-mean=%f, std=%f' % (np.mean(rho_te), np.std(rho_te)))
+print('test R2-mean=%f, std=%f' % (np.mean(r2_te), np.std(r2_te)))
     # plt.close()
 
