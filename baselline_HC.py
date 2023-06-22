@@ -10,7 +10,7 @@ from utils import *
 
 from baseline_models import *
 dataset = pickle.load(open("./NeuralData/example_data_hc_mine.p", "rb"))
-batch_size=10
+batch_size=5
 ''' data'''
 
 
@@ -26,7 +26,7 @@ def preprocess_HC(x_in,z_in,downsample_rate, episod_len):
     ''' down sampling rate'''
 
     x = x[np.arange(0, data_len, downsample_rate), :]
-    x = calDesignMatrix_V2(x, 3).squeeze()
+    x = calDesignMatrix_V2(x, 1).squeeze()
     z = z[np.arange(0, data_len, downsample_rate), :]
 
     x_new = np.zeros((episod_len,(x.shape[0]//episod_len), x.shape[1]))
@@ -46,7 +46,7 @@ Dataset_test = get_dataset_HC(x_test, z_test, device)
 Dataset_loader = DataLoader(Dataset, batch_size=batch_size,shuffle=False)
 Dataset_val_loader = DataLoader(Dataset_val, batch_size=z_val.shape[1],shuffle=False)
 Dataset_test_loader = DataLoader(Dataset_test, batch_size=z_test.shape[1],shuffle=False)
-model = VRNN_baseline(latent_dim=z_tr.shape[-1], obser_dim=x_tr.shape[-1], n_layers=2,
+model = VariationalSeq2Seq_baseline(latent_dim=z_tr.shape[-1], obser_dim=x_tr.shape[-1], n_layers=2,
               device=device).to(device)
 model.apply(init_weights)
 
@@ -56,7 +56,7 @@ print(f'The GRU_base model has {count_parameters(model):,} trainable parameters'
 optimizer = optim.Adam(model.parameters(), lr=1e-3)
 CLIP = 1
 total_loss=[]
-Numb_Epochs=10
+Numb_Epochs=100
 for epoch in range(Numb_Epochs):
     epoch_loss = 0
     for i, batch in enumerate(Dataset_loader):
@@ -75,9 +75,9 @@ for epoch in range(Numb_Epochs):
     total_loss.append(epoch_loss)
 
 ''' save and load models'''
-# torch.save(model.state_dict(), 'v_final_model_HC_5mc_1000_V2.pt')
-#
-# model.load_state_dict(torch.load('final_model_HC_5mc_1000_V2.pt'))
+torch.save(model.state_dict(), 'VSS_final_model_HC_5mc_1000_V2.pt')
+
+model.load_state_dict(torch.load('VSS_final_model_HC_5mc_1000_V2.pt'))
 ''''''
 
 import matplotlib.pyplot as plt
@@ -88,9 +88,9 @@ from metrics import get_R2
 from metrics import get_rho
 model.sigma_x=torch.Tensor([.5]).to(device)
 save_result_path = 'Results/'
-# plt.figure()
-# plt.plot(total_loss)
-# plt.show()
+plt.figure()
+plt.plot(total_loss)
+plt.show()
 r2_tr=[]
 rho_tr=[]
 Dataset_loader = DataLoader(Dataset, batch_size=z_tr.shape[1],shuffle=False)
@@ -100,7 +100,7 @@ for i, batch in enumerate(Dataset_loader):
     z = torch.swapaxes(z, 0, 1)
 
 z = z.detach().cpu().numpy().squeeze()
-max_numb_repret=15
+max_numb_repret=3
 trj_samples = np.arange(0, z.shape[1])
 for ii in trj_samples:
     f, axes = plt.subplots(2, 1, sharex=True, sharey=False)
@@ -116,8 +116,8 @@ for ii in trj_samples:
     axes[0].plot(z[1:, ii, 0].squeeze(), 'k')
     axes[1].plot(z[1:,ii, 1].squeeze(), 'k')
     plt.title('with observations')
-    plt.savefig(save_result_path + 'VRNN-Train-'+str(ii)+'-HC-with-obsr.png')
-    plt.savefig(save_result_path + 'VRNN-Train-'+str(ii)+'-HC-with-obsr.svg', format='svg')
+    plt.savefig(save_result_path + 'VSS-Train-'+str(ii)+'-HC-with-obsr.png')
+    plt.savefig(save_result_path + 'VSS-Train-'+str(ii)+'-HC-with-obsr.svg', format='svg')
     rho_tr.append(np.mean(np.abs(get_rho(z[1:, ii,:].squeeze(),z_hat.squeeze()))))
     r2_tr.append(np.mean(np.abs(get_R2(z[1:, ii, :].squeeze(), z_hat.squeeze()))))
 print('train rho-mean=%f, std=%f'%(np.mean(rho_tr),np.std(rho_tr)))
@@ -149,8 +149,8 @@ for ii in trj_samples:
     axes[1].plot(z[ii,1:, 1].squeeze(), 'k')
 
     plt.title('with observations')
-    plt.savefig(save_result_path + 'VRNN-Val-'+str(ii)+'-HC-with-obsr.png')
-    plt.savefig(save_result_path + 'VRNN-Val-'+str(ii)+'-HC-with-obsr.svg', format='svg')
+    plt.savefig(save_result_path + 'VSS-Val-'+str(ii)+'-HC-with-obsr.png')
+    plt.savefig(save_result_path + 'VSS-Val-'+str(ii)+'-HC-with-obsr.svg', format='svg')
     rho_val.append(np.mean(np.abs(get_rho(z[ii,1:, :].squeeze(), z_hat.squeeze()))))
     r2_val.append(np.mean(np.abs(get_R2(z[ii,1:, :].squeeze(), z_hat.squeeze()))))
 print('val rho-mean=%f, std=%f' % (np.mean(rho_val), np.std(rho_val)))
@@ -181,8 +181,8 @@ for ii in trj_samples:
     axes[1].plot(z[ii,1:, 1].squeeze(), 'k')
 
     plt.title('with observations')
-    plt.savefig(save_result_path + 'VRNN-Test-'+str(ii)+'-HC-with-obsr.png')
-    plt.savefig(save_result_path + 'VRNN-Test-'+str(ii)+'-HC-with-obsr.svg', format='svg')
+    plt.savefig(save_result_path + 'VSS-Test-'+str(ii)+'-HC-with-obsr.png')
+    plt.savefig(save_result_path + 'VSS-Test-'+str(ii)+'-HC-with-obsr.svg', format='svg')
     rho_te.append(np.mean(np.abs(get_rho(z[ii, 1:, :].squeeze(), z_hat.squeeze()))))
     r2_te.append(np.mean(np.abs(get_R2(z[ii, 1:, :].squeeze(), z_hat.squeeze()))))
 print('test rho-mean=%f, std=%f' % (np.mean(rho_te), np.std(rho_te)))
